@@ -54,7 +54,7 @@ const Login: React.FC = () => {
         return;
       }
 
-      router.push("/");
+      window.location.href = "/";
     } catch (error) {
       console.error("LOGIN FETCH ERROR:", error);
       setError("Erreur réseau. Réessayez.");
