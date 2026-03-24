@@ -36,6 +36,7 @@ const Register: React.FC = () => {
     setStep(2);
   };
 
+
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setError(null);
@@ -44,29 +45,38 @@ const handleSubmit = async (e: React.FormEvent) => {
     setError("Les mots de passe ne correspondent pas.");
     return;
   }
+
   if (!form.agreeTerms) {
     setError("Vous devez accepter les conditions.");
     return;
   }
 
+  const payload = {
+    fullName: `${form.firstName} ${form.lastName}`.trim(),
+    email: form.email.trim().toLowerCase(),
+    password: form.password,
+  };
+
   setLoading(true);
+
   try {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     });
 
     const data = await res.json();
+    console.log("REGISTER RESPONSE:", data);
 
     if (!res.ok) {
-      setError(data?.error || "Erreur lors de l'inscription.");
+      setError(data?.message || "Erreur lors de l'inscription.");
       return;
     }
 
-    // ✅ succès -> rediriger vers login
-    router.push(`/login?registered=1&email=${encodeURIComponent(form.email)}`);
-  } catch {
+    router.push(`/login?registered=1&email=${encodeURIComponent(payload.email)}`);
+  } catch (error) {
+    console.error("REGISTER FETCH ERROR:", error);
     setError("Erreur réseau. Réessayez.");
   } finally {
     setLoading(false);

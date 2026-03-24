@@ -1,35 +1,57 @@
-import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import bcrypt from "bcryptjs";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { signToken } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { getDb } from "@/lib/mongodb";
+import { signToken, verifyPassword } from "@/lib/auth";
 
-const LoginSchema = z.object({
-  email: z.string().email().transform((v) => v.toLowerCase().trim()),
-  password: z.string().min(1),
+const loginSchema = z.object({
+  email: z.string().email("Email invalide"),
+  password: z.string().min(1, "Mot de passe requis"),
 });
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const data = LoginSchema.parse(body);
 
-    const client = await clientPromise;
-    const db = client.db();
-    const users = db.collection("users");
+    const parsed = loginSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Données invalides",
+          errors: parsed.error.flatten(),
+        },
+        { status: 400 }
+      );
+    }
 
-    const user = await users.findOne({ email: data.email });
+    const email = parsed.data.email.trim().toLowerCase();
+    const password = parsed.data.password;
+
+    const db = await getDb();
+    const usersCollection = db.collection("users");
+
+    const user = await usersCollection.findOne({ email });
+
     if (!user) {
       return NextResponse.json(
-        { ok: false, error: "Email ou mot de passe incorrect." },
+        { ok: false, message: "Email ou mot de passe incorrect" },
         { status: 401 }
       );
     }
 
-    const ok = await bcrypt.compare(data.password, user.passwordHash);
-    if (!ok) {
+    if (!user.isActive) {
       return NextResponse.json(
-        { ok: false, error: "Email ou mot de passe incorrect." },
+        { ok: false, message: "Compte désactivé" },
+        { status: 403 }
+      );
+    }
+
+    const isPasswordValid = await verifyPassword(password, user.passwordHash);
+
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { ok: false, message: "Email ou mot de passe incorrect" },
         { status: 401 }
       );
     }
@@ -37,21 +59,33 @@ export async function POST(req: Request) {
     const token = await signToken({
       sub: user._id.toString(),
       email: user.email,
-      role: user.role ?? "USER",
+      role: user.role,
     });
 
-    const res = NextResponse.json({ ok: true });
-    res.cookies.set("token", token, {
+    const cookieStore = await cookies();
+    cookieStore.set("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 jours
+      maxAge: 60 * 60 * 24 * 7,
     });
-    return res;
-  } catch (err: any) {
-    const msg =
-      err?.issues?.[0]?.message || err?.message || "Erreur lors du login.";
-    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+
+    return NextResponse.json({
+      ok: true,
+      message: "Connexion réussie",
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+    return NextResponse.json(
+      { ok: false, message: "Erreur interne du serveur" },
+      { status: 500 }
+    );
   }
 }

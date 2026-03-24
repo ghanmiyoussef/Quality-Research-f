@@ -1,25 +1,70 @@
 "use client";
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import "./login.css";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const Login: React.FC = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const registered = searchParams.get("registered");
+    const emailFromQuery = searchParams.get("email");
+
+    if (emailFromQuery) {
+      setEmail(emailFromQuery);
+    }
+
+    if (registered === "1") {
+      setSuccessMessage("Inscription réussie. Vous pouvez maintenant vous connecter.");
+    }
+  }, [searchParams]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
     setLoading(true);
-    setTimeout(() => setLoading(false), 2000);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
+      });
+
+      const data = await res.json();
+      console.log("LOGIN RESPONSE:", JSON.stringify(data, null, 2));
+
+      if (!res.ok) {
+        setError(data?.message || "Email ou mot de passe incorrect.");
+        return;
+      }
+
+      router.push("/");
+    } catch (error) {
+      console.error("LOGIN FETCH ERROR:", error);
+      setError("Erreur réseau. Réessayez.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="login-page">
-     
-
-      
-      {/* Login Card */}
       <main className="login-main">
         <div className="login-card">
           <div className="login-card-header">
@@ -32,6 +77,18 @@ const Login: React.FC = () => {
               notre communauté de professionnels de santé.
             </p>
           </div>
+
+          {successMessage && (
+            <p style={{ color: "green", marginBottom: "12px" }}>
+              {successMessage}
+            </p>
+          )}
+
+          {error && (
+            <p style={{ color: "red", marginBottom: "12px" }}>
+              {error}
+            </p>
+          )}
 
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="form-group">
@@ -53,6 +110,7 @@ const Login: React.FC = () => {
                   Mot de passe oublié ?
                 </a>
               </label>
+
               <div className="password-wrapper">
                 <input
                   id="password"
@@ -62,6 +120,7 @@ const Login: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+
                 <button
                   type="button"
                   className="toggle-password"
@@ -86,19 +145,12 @@ const Login: React.FC = () => {
               className={`btn-login ${loading ? "loading" : ""}`}
               disabled={loading}
             >
-              {loading ? (
-                <span className="spinner" />
-              ) : (
-                "Se connecter →"
-              )}
+              {loading ? <span className="spinner" /> : "Se connecter →"}
             </button>
           </form>
 
-          
-
           <p className="login-register">
-            Pas encore membre ?{" "}
-            <a href="/register">Créer un compte</a>
+            Pas encore membre ? <a href="/register">Créer un compte</a>
           </p>
         </div>
       </main>

@@ -39,7 +39,7 @@ export default function RootLayout({
                 <div className="flex flex-col">
                   <span className="font-display text-xl font-bold leading-none text-primary">
                     Quality &amp; Research
-                  </span>
+                  </span>      
                   <span className="mt-1 text-xs leading-none text-gray-600">
                     Excellence en Santé
                   </span>
@@ -52,7 +52,7 @@ export default function RootLayout({
 
                 <NavDropdown label="À propos">
                   <DropdownItem href="/about/who-we-are">
-                    Qui sommes-nous ?
+                    Qui sommes-nous ?   
                   </DropdownItem>
                   <DropdownItem href="/about/vision-mission">
                     Vision &amp; Mission
